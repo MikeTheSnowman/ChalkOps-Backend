@@ -1,0 +1,271 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Global Database Schema (Global Control Plane)
+// This schema contains global system metadata and tenant mapping
+
+/// Multi-tenant organization management for SaaS platform
+/// Each tenant represents a customer organization (e.g., "Acme Corp", "TechStart Inc.")
+/// Handles data sovereignty requirements and regional deployment assignments
+model Tenant {
+  id                        String   @id @default(uuid(7)) @db.Uuid
+  tenant_name               String   @unique
+  home_country              String
+  data_sovereignty_required Boolean  @default(true)
+  assigned_region_cluster_id String
+  assigned_regional_db_endpoint String
+  status                    TenantStatus @default(ONBOARDING)
+  created_at                DateTime @default(now())
+  updated_at                DateTime @updatedAt
+
+  @@map("tenants")
+}
+
+/// ChalkOps platform administrators and support engineers
+/// Global system users who manage the platform, not tenant-specific users
+/// Includes super admins and support engineers with global access
+model GlobalSystemUser {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  email        String   @unique
+  password_hash String
+  role         GlobalUserRole
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  @@map("global_system_users")
+}
+
+/// Security and rate limiting for malicious IP addresses
+/// Hybrid approach: Cache for fast lookups, Database for audit trail
+/// Tracks blocking history, reasons, and manual overrides by support
+model IpBlacklist {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  ip_address    String   // Not @id since we want audit trail
+  blocked_until DateTime
+  reason        String?
+  blocked_by    String?  // Global system user who blocked it
+  unblocked_at  DateTime? // Track when it was manually unblocked
+  unblocked_by  String?  // Who unblocked it
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@map("ip_blacklist")
+  @@index([ip_address]) // For quick lookups
+}
+
+// Regional Database Schema (Tenant-Specific Data)
+// Each tenant will have their own schema: schema_<tenant_id>.
+/// Tenant user management within each organization
+/// Users within each tenant (developers, admins, viewers)
+/// Supports both password and Passkey authentication
+/// Each user belongs to a specific tenant with role-based access
+model User {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  email             String   @unique
+  password_hash     String?  // Nullable for Passkey-only users
+  tenant_id         String   @db.Uuid
+  tenant_user_role  UserRole
+  status            UserStatus @default(ACTIVE)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  // Relations
+  webauthn_credentials WebAuthnCredential[]
+  migration_jobs     MigrationJob[]
+  created_migration_jobs MigrationJob[] @relation("JobCreator")
+
+  @@map("users")
+}
+
+/// Passkey credentials for passwordless authentication
+/// Stores WebAuthn credentials for modern security standards
+/// Supports multiple devices per user and tracks usage patterns
+/// Enables secure, phishing-resistant authentication
+model WebAuthnCredential {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  user_id           String   @db.Uuid
+  public_key        Bytes
+  sign_count        BigInt   @default(0)
+  aaguid            String?  @db.Uuid
+  transports        String[]
+  friendly_name     String?
+  is_discoverable   Boolean  @default(false)
+  created_at        DateTime @default(now())
+  last_used_at      DateTime @default(now())
+
+  // Relations
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("webauthn_credentials")
+}
+
+/// DevOps platform integrations and connections
+/// Stores connections to various DevOps platforms (GitHub, GitLab, Azure DevOps, Jenkins)
+/// Secrets are stored in HashiCorp Vault for security
+/// Each integration belongs to a specific tenant
+model Integration {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  tenant_id         String   @db.Uuid
+  platform_type     PlatformType
+  name              String
+  description       String?
+  vault_secret_path String
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  // Relations
+  source_migration_jobs MigrationJob[] @relation("SourceIntegration")
+  target_migration_jobs MigrationJob[] @relation("TargetIntegration")
+
+  @@map("integrations")
+}
+
+/// Core migration job tracking and management
+/// The heart of ChalkOps - tracks migration jobs (repo migrations, pipeline conversions, full migrations)
+/// Links source and target platforms, tracks progress, and stores configuration
+/// Each job belongs to a specific tenant and user
+model MigrationJob {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  tenant_id         String   @db.Uuid
+  user_id           String   @db.Uuid
+  creator_id        String   @db.Uuid
+  source_platform_id String? @db.Uuid
+  target_platform_id String? @db.Uuid
+  status            JobStatus @default(PENDING)
+  job_type          JobType
+  config_data       Json
+  assigned_agent_id String?  @db.Uuid
+  result_summary    Json?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+  completed_at      DateTime?
+
+  // Relations
+  user              User     @relation(fields: [user_id], references: [id])
+  creator           User     @relation("JobCreator", fields: [creator_id], references: [id])
+  source_platform   Integration? @relation("SourceIntegration", fields: [source_platform_id], references: [id])
+  target_platform   Integration? @relation("TargetIntegration", fields: [target_platform_id], references: [id])
+  agent             Agent?
+  steps             MigrationJobStep[]
+
+  @@map("migration_jobs")
+}
+
+/// Granular migration progress tracking
+/// Breaks down migration jobs into individual steps (e.g., "Clone Repository", "Convert Pipeline", "Push to Target")
+/// Provides detailed progress tracking and debugging capabilities
+/// Each step belongs to a specific migration job
+model MigrationJobStep {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  job_id      String   @db.Uuid
+  step_name   String
+  status      StepStatus @default(PENDING)
+  start_time  DateTime?
+  end_time    DateTime?
+  details     Json?
+
+  // Relations
+  job         MigrationJob @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  @@map("migration_job_steps")
+}
+
+/// Hybrid worker agent management
+/// Manages the hybrid worker agents (self-hosted and customer-hosted) that execute migration jobs
+/// Tracks their status, capabilities, and current assignments
+/// Each agent belongs to a specific tenant and can handle one job at a time
+model Agent {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  tenant_id         String   @db.Uuid
+  type              AgentType
+  status            AgentStatus @default(OFFLINE)
+  version           String
+  last_heartbeat    DateTime @default(now())
+  capabilities      Json
+  current_job_id    String?  @db.Uuid @unique
+  ip_address        String?
+
+  // Relations
+  current_job       MigrationJob? @relation(fields: [current_job_id], references: [id])
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@map("agents")
+}
+
+// Enums
+enum TenantStatus {
+  ACTIVE
+  ONBOARDING
+  SUSPENDED
+}
+
+enum GlobalUserRole {
+  SUPER_ADMIN
+  SUPPORT_ENGINEER
+}
+
+enum UserRole {
+  ADMIN
+  DEVELOPER
+  VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum PlatformType {
+  GITHUB_CLOUD
+  GITHUB_ENTERPRISE
+  GITLAB_CLOUD
+  GITLAB_SELF_HOSTED
+  AZURE_DEVOPS_CLOUD
+  AZURE_DEVOPS_SERVER
+  JENKINS
+}
+
+enum JobStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum JobType {
+  REPO_MIGRATION
+  PIPELINE_CONVERSION
+  FULL_MIGRATION
+}
+
+enum StepStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum AgentType {
+  SELF_HOSTED
+  CUSTOMER_HOSTED
+}
+
+enum AgentStatus {
+  ONLINE
+  OFFLINE
+  BUSY
+  IDLE
+} 
