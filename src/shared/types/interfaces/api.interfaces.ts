@@ -2,7 +2,7 @@
  * API-related interfaces for ChalkOps Platform
  */
 
-import { UUID } from './domain.interfaces';
+import { UUID7 } from './domain.interfaces';
 
 // Authentication types
 export interface LoginRequest {
@@ -20,17 +20,17 @@ export interface LoginResponse {
   token_type: 'Bearer';
   expires_in: number;
   user: {
-    user_id: UUID;
+    user_id: UUID7;
     email: string;
-    tenant_id: UUID;
+    tenant_id: UUID7;
     tenant_name: string;
     roles: string[];
   };
 }
 
 export interface JwtPayload {
-  sub: UUID; // user_id
-  tid: UUID; // tenant_id
+  sub: UUID7; // user_id
+  tid: UUID7; // tenant_id
   tname: string; // tenant_name
   rid: string; // assigned_region_cluster_id
   roles: string[];
@@ -67,10 +67,10 @@ export interface PaginatedResponse<T> {
 
 // Logging context type
 export interface LogContext {
-  tenant_id?: UUID;
-  user_id?: UUID;
-  job_id?: UUID;
-  agent_id?: UUID;
+  tenant_id?: UUID7;
+  user_id?: UUID7;
+  job_id?: UUID7;
+  agent_id?: UUID7;
   request_id?: string;
   [key: string]: any;
 } 

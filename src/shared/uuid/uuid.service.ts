@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { v7 as uuidv7 } from 'uuid';
+import { UUID7 } from './uuid7.class';
 
 /**
  * UUID v7 Service for ChalkOps Platform
@@ -21,13 +22,30 @@ export class UuidService {
   }
 
   /**
+   * Generates a UUID7 instance with validation
+   * @returns UUID7 instance with a newly generated UUID v7
+   */
+  generateV7Instance(): UUID7 {
+    return UUID7.generate();
+  }
+
+  /**
    * Validates if a string is a valid UUID v7
    * @param uuid - The UUID string to validate
    * @returns True if valid UUID v7, false otherwise
    */
   isValidV7(uuid: string): boolean {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(uuid);
+    return UUID7.isValid(uuid);
+  }
+
+  /**
+   * Creates a UUID7 instance from a string with validation
+   * @param uuid - The UUID string to validate and wrap
+   * @returns UUID7 instance if valid, throws error if invalid
+   * @throws Error if the string is not a valid UUID v7
+   */
+  createV7Instance(uuid: string): UUID7 {
+    return UUID7.create(uuid);
   }
 
   /**
@@ -36,17 +54,7 @@ export class UuidService {
    * @returns Date object or null if not a valid v7 UUID
    */
   getTimestampFromV7(uuid: string): Date | null {
-    try {
-      // UUID v7 format: timestamp (48 bits) + random (74 bits)
-      // Extract timestamp from first 6 bytes
-      const hex = uuid.replace(/-/g, '');
-      const timestampHex = hex.substring(0, 12);
-      const timestampMs = parseInt(timestampHex, 16);
-      
-      return new Date(timestampMs);
-    } catch (error) {
-      return null;
-    }
+    return UUID7.getTimestamp(uuid);
   }
 
   /**
@@ -64,11 +72,6 @@ export class UuidService {
    * @returns True if time-ordered UUID
    */
   isTimeOrdered(uuid: string): boolean {
-    // Check version bits (bits 4-7 of byte 6)
-    const hex = uuid.replace(/-/g, '');
-    const version = parseInt(hex.substring(12, 14), 16) >> 4;
-    
-    // v1, v6, v7 are time-ordered
-    return version === 1 || version === 6 || version === 7;
+    return UUID7.isTimeOrdered(uuid);
   }
 } 

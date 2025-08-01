@@ -5,6 +5,10 @@ import { CryptoService } from './crypto/crypto.service';
 import { ConfigService } from './config/config.service';
 import { PrismaService } from './database/prisma.service';
 import { IpBlacklistService } from './security/ip-blacklist.service';
+ import { VaultService } from './security/vault.service';
+import { SecurityService } from './security/security.service';
+import { SecretsServiceFactory } from './secrets/secrets.service.factory';
+import { VaultSecretsProvider } from './secrets/providers/vault-secrets.provider';
 import { CacheService } from './cache/cache.service';
 
 /**
@@ -25,6 +29,10 @@ import { CacheService } from './cache/cache.service';
     ConfigService,
     PrismaService,
     IpBlacklistService,
+    VaultService,
+    SecurityService,
+    SecretsServiceFactory,
+    VaultSecretsProvider,
     CacheService,
   ],
   exports: [
@@ -34,6 +42,10 @@ import { CacheService } from './cache/cache.service';
     ConfigService,
     PrismaService,
     IpBlacklistService,
+    VaultService,
+    SecurityService,
+    SecretsServiceFactory,
+    VaultSecretsProvider,
     CacheService,
   ],
 })

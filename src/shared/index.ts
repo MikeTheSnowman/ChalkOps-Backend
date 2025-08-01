@@ -7,6 +7,7 @@
 
 // UUID Service
 export { UuidService } from './uuid/uuid.service';
+export { UUID7 } from './uuid/uuid7.class';
 
 // Logging Service
 export { LoggerService, LogContext, LogEntry } from './logging/logger.service';
@@ -32,6 +33,22 @@ export {
 
 // Configuration Service
 export { ConfigService } from './config/config.service';
+
+// Database Service
+export { PrismaService } from './database/prisma.service';
+
+// Security Services
+export { IpBlacklistService } from './security/ip-blacklist.service';
+export { VaultService } from './security/vault.service';
+export { SecurityService } from './security/security.service';
+
+// Secrets Services
+export { SecretsServiceFactory } from './secrets/secrets.service.factory';
+export { VaultSecretsProvider } from './secrets/providers/vault-secrets.provider';
+export { ISecretsProvider } from './secrets/interfaces/secrets-provider.interface';
+
+// Cache Service
+export { CacheService } from './cache/cache.service';
 
 // All Types (Enums and Interfaces)
 export * from './types'; 
